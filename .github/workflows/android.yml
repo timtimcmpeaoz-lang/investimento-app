@@ -1,0 +1,39 @@
+
+name: Gerar APK Android
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar Android
+        uses: android-actions/setup-android@v4
+
+      - name: Instalar ferramentas
+        run: npm install -g @bubblewrap/cli
+
+      - name: Gerar APK
+        run: |
+          mkdir -p android-app
+          cd android-app
+          bubblewrap init --manifest https://timtimcmpeaoz-lang.github.io/${{ github.event.repository.name }}/manifest.json --directory . --packageId com.meuapp.android --appName "Meu Aplicativo" --launcherName "Meu App" --display standalone --themeColor "#1565c0" --backgroundColor "#101827" --skipPwaValidation --jdkPath "$JAVA_HOME" --androidSdkPath "$ANDROID_HOME"
+          bubblewrap build
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Meu-Aplicativo-APK
+          path: android-app/**/*.apk
+          if-no-files-found: error
