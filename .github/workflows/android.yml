@@ -1,4 +1,5 @@
 
+
 name: Gerar APK Android
 
 on:
@@ -18,22 +19,117 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
       - name: Preparar Android
         uses: android-actions/setup-android@v4
 
-      - name: Instalar ferramentas
-        run: npm install -g @bubblewrap/cli
-
-      - name: Gerar APK
+      - name: Instalar SDK Android
         run: |
-          mkdir -p android-app
-          cd android-app
-          bubblewrap init --manifest https://timtimcmpeaoz-lang.github.io/${{ github.event.repository.name }}/manifest.json --directory . --packageId com.meuapp.android --appName "Meu Aplicativo" --launcherName "Meu App" --display standalone --themeColor "#1565c0" --backgroundColor "#101827" --skipPwaValidation --jdkPath "$JAVA_HOME" --androidSdkPath "$ANDROID_HOME"
-          bubblewrap build
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Criar projeto Android
+        run: |
+          mkdir -p app/src/main/java/com/meuinvestimento/app
+          mkdir -p app/src/main/assets
+
+          cp index.html app/src/main/assets/index.html
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "MeuInvestimento"
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.meuinvestimento.app'
+              compileSdk 35
+              defaultConfig {
+                  applicationId 'com.meuinvestimento.app'
+                  minSdk 23
+                  targetSdk 28
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:label="Meu Investimento"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar"
+                  android:usesCleartextTraffic="false">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/meuinvestimento/app/MainActivity.java <<'EOF'
+          package com.meuinvestimento.app;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebSettings;
+
+          public class MainActivity extends Activity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView web = new WebView(this);
+                  WebSettings settings = web.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  setContentView(web);
+                  web.loadUrl("file:///android_asset/index.html");
+              }
+          }
+          EOF
+
+      - name: Compilar APK
+        run: |
+          gradle assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk Meu-Investimento.apk
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: Meu-Aplicativo-APK
-          path: android-app/**/*.apk
+          name: Meu-Investimento-APK
+          path: Meu-Investimento.apk
           if-no-files-found: error
+          retention-days: 7
